@@ -25,6 +25,7 @@ Ensuite l'appli s'ouvre depuis son icône, plein écran, même sans réseau.
 
 - **Photographe principal** : dans Klassali, menu **Terrain** → scanner le QR « Photographe principal » avec l'appareil photo du téléphone (il ouvre l'appli avec l'école et les classes). Puis **Exporter le fichier projet** dans Klassali, l'envoyer sur le téléphone (Drive, WhatsApp, câble) et le charger dans l'appli : ⚙ **Paramètres → Charger le fichier projet**. Les noms des élèves apparaissent.
 - **2ᵉ photographe** : scanner le QR « 2ᵉ photographe ». Rien d'autre à faire : l'appli s'ouvre directement sur les photos de classe. Aucun nom d'élève n'est transmis.
+- **Si le QR se lit mal** : dans Klassali, cliquer sur le QR (plein écran), ou « Copier le lien » et l'envoyer par WhatsApp : en touchant le lien, le projet se crée. On peut aussi coller le **code** (« Copier le code ») dans l'appli : écran d'accueil ou ⚙ Paramètres → « Code projet ».
 
 ## 4. Sur le terrain
 
@@ -37,14 +38,15 @@ Ensuite l'appli s'ouvre depuis son icône, plein écran, même sans réseau.
 
 ## 5. Au retour
 
-**Exporter** → **Partager** vers WhatsApp, Drive ou mail (ou « Télécharger »). Deux fichiers : `….json` (lu par Klassali) et `….csv` (lisible dans Excel).
+**Exporter** → **Envoyer par e-mail** : le partage Android s'ouvre avec le fichier joint et l'objet déjà rempli (« École Jules Ferry 2026-2027 — groupes (Prénom) »). Choisir Gmail, indiquer le destinataire (l'adresse est rappelée dans le message et dans ⚙ Paramètres ; Gmail la propose dès le 2ᵉ envoi), envoyer. Deux fichiers partent : `….json` (lu par Klassali) et `….csv` (lisible dans Excel). « Télécharger » reste possible.
 
 Noms des fichiers : `Principale_École_Année`, `Rattrapage_École_AAAA-MM-JJ`, `Groupes_École_AAAA-MM-JJ_Prénom`.
 
-Dans Klassali : menu **Terrain → Importer le fichier du téléphone** (étape suivante du développement).
+Dans Klassali : menu **Terrain → Importer le fichier du téléphone**. Le fichier est rangé dans « Fichiers reçus » et rien ne bouge tant que vous ne cliquez pas **Renommage** : à ce moment Klassali demande où sont les photos et fait la correspondance (étape suivante du développement).
 
 ## Réglages utiles (⚙)
 
-- **Votre prénom** : ajouté au nom du fichier des groupes (utile avec plusieurs photographes).
+- **Adresse e-mail de réception** : rappelée dans le message d'envoi.
+- **Votre prénom** : ajouté au nom du fichier des groupes et à l'objet du message.
 - **Préfixe du boîtier** (R62A) : affichage seulement, le fichier contient toujours le numéro seul.
 - Plusieurs projets peuvent cohabiter sur le téléphone ; **Effacer ce projet** après export.
