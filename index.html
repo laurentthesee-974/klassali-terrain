@@ -124,7 +124,7 @@ input[type=file]{width:100%;min-height:52px;font-size:14px}
 <script>
 (function(){
 'use strict';
-var APP_VERSION='1.1.0';
+var APP_VERSION='1.3.0';
 var LS='klassali-terrain-v1';
 
 /* =========================== état =========================== */
@@ -149,9 +149,10 @@ function sname(s){if(!s)return'?';if(s.generic)return'Élève rattrapage '+(s.ge
 function pad(n){return S.prefix?S.prefix+String(n).padStart(4,'0'):String(n)}
 function sortedSeries(sx){return (sx||sess()||{series:[]}).series.slice().sort(function(a,b){return a.num-b.num})}
 function assignedNum(sid,exceptId){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.id===exceptId)return;if((e.type==='eleve'&&String(e.studentId)===String(sid))||(e.type==='fratrie'&&(e.members||[]).some(function(m){return String(m)===String(sid)})))r=e.num});return r}
-function isAbsent(s){return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise')} // sans photo = à rattraper
+var GROUP_ONLY='Groupe seul'; // fait uniquement la photo de groupe : ni absent ni à rattraper
+function isAbsent(s){return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
 function absLabel(s){return s.statut==='Absent'?'absent':'sans photo'}
-function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&!s.created;return false})}
+function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&!s.created;return false})}
 function toast(m){document.querySelectorAll('.toast').forEach(function(x){x.remove()});var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);clearTimeout(toastT);toastT=setTimeout(function(){t.remove()},2600)}
 
 /* =========================== QR (#k=) et fichier projet =========================== */
@@ -287,7 +288,7 @@ function pickHtml(multi){
   if(!l.length)return'<div class="empty" style="padding:12px">Aucun élève avec ce filtre. Utilisez « Nouvel élève ».</div>';
   l.slice(0,300).forEach(function(s){
     var n=assignedNum(s.id,D.id),on=multi?D.members.map(String).indexOf(String(s.id))>-1:String(D.studentId)===String(s.id);
-    var st=n!==null?'<span class="st done">n° '+n+'</span>':(isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st n">'+(s.statut==='Photo prise'?'photo prise':'présent')+'</span>');
+    var st=n!==null?'<span class="st done">n° '+n+'</span>':(s.statut===GROUP_ONLY?'<span class="st n">👥 groupe seul</span>':s.statut==='Refus'?'<span class="st n">refus</span>':isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st n">'+(s.statut==='Photo prise'?'photo prise':'présent')+'</span>');
     h+='<button data-act="'+(multi?'tm':'ps')+'" data-id="'+esc(s.id)+'" aria-pressed="'+on+'">'+(multi?'<span class="chk">'+(on?'✓':'')+'</span>':'')+'<span class="nm">'+esc(sname(s))+(D.cls==='all'?' <span style="font-weight:400;color:var(--muted)">· '+esc(cls(s.classId))+'</span>':'')+'</span>'+st+'</button>'});
   return h}
 function classSelect(sel,allowAll,id,withNew){
@@ -380,29 +381,33 @@ function buildExport(){
     var c=o.classId?cls(o.classId):'';var st=o.studentId?stu(o.studentId):null;
     return[o.num,o.numEnd===null?'':o.numEnd,o.type,c,o.type==='eleve'?o.label:'',o.type==='fratrie'?o.label:'',o.type==='fratrie'?(o.members||[]).map(function(m){return sname(stu(m))}).join('|'):'',(st&&st.created)||(o.type==='classe'&&p.classes.filter(function(x){return String(x.id)===String(o.classId)&&x.created}).length)?1:0].join(';')})).join('\n');
   var base=(k==='principale'?'Principale_'+fileSafe(p.school)+'_'+fileSafe(p.year):k==='rattrapage'?'Rattrapage_'+fileSafe(p.school)+'_'+sessLot():'Groupes_'+fileSafe(p.school)+'_'+todayIso()+(S.photographer?'_'+fileSafe(S.photographer):''));
-  return{json:json,csv:csv,base:base}}
+  // Un SEUL fichier .csv (Android refuse de partager un .json) : tableau lisible dans Excel
+  // + une ligne technique #KLASSALI;… qui contient toutes les données pour Klassali.
+  var file='\ufeff'+csv+'\n\n# Ligne technique pour Klassali (ne pas modifier)\n#KLASSALI;'+b64utf8(JSON.stringify(json))+'\n';
+  return{json:json,csv:csv,file:file,base:base}}
+function b64utf8(s){var b=new TextEncoder().encode(s),bin='';for(var i=0;i<b.length;i+=0x8000)bin+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(bin)}
 function mailSubject(){var p=P(),k=sessKind();return p.school+' '+p.year+' — '+(k==='groupes'?'groupes':k==='rattrapage'?'rattrapage '+sessLot():'séance principale')+(S.photographer?' ('+S.photographer+')':'')}
 function openExport(){
   var ex=buildExport();window.__lastExport=ex;
   var canShare=!!(navigator.share&&navigator.canShare&&window.File);
   var h='<div class="overlay" data-act="close"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-h"><h3>Exporter '+esc(sessLabel())+'</h3><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
-  h+='<div class="hint" style="margin:0">'+ex.json.series.length+' série(s) · fichier <b>'+esc(ex.base)+'.json</b> (lu par Klassali) + <b>'+esc(ex.base)+'.csv</b> (lisible dans Excel).</div>';
+  h+='<div class="hint" style="margin:0">'+ex.json.series.length+' série(s) · fichier <b>'+esc(ex.base)+'.csv</b> : à importer dans Klassali (Terrain → Fichiers reçus), lisible aussi dans Excel.</div>';
   if(!ex.json.series.length)h+='<div class="warn">Aucune série à exporter.</div>';
   h+='<div class="hint" style="margin:0">Objet du message : <b>'+esc(mailSubject())+'</b> · à envoyer à <b>'+esc(S.email||'')+'</b></div>';
-  h+='<button class="btn" data-act="share" '+(ex.json.series.length?'':'disabled')+'>'+(canShare?'✉ Envoyer par e-mail (ou WhatsApp, Drive…)':'Télécharger le fichier JSON')+'</button>';
-  if(canShare)h+='<div class="hint" style="margin:0">Choisissez Gmail dans la liste : le fichier est joint et l’objet rempli ; il reste à indiquer le destinataire (Gmail le propose dès le 2ᵉ envoi).</div><button class="btn sec" data-act="download">Télécharger (JSON + CSV)</button>';
-  h+='<a class="btn sec" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="mailto:'+esc(encodeURIComponent(S.email||''))+'?subject='+esc(encodeURIComponent(mailSubject()))+'&body='+esc(encodeURIComponent('Fichier Klassali Terrain : '+ex.base+'.json (à joindre depuis Téléchargements si absent).'))+'">Ouvrir un e-mail vide (sans pièce jointe)</a>';
-  h+='<button class="btn sec" data-act="copy">Copier le JSON</button><pre class="csv">'+esc(ex.csv)+'</pre></div></div>';
+  h+='<button class="btn" data-act="share" '+(ex.json.series.length?'':'disabled')+'>'+(canShare?'✉ Envoyer par e-mail (ou WhatsApp, Drive…)':'Télécharger le fichier')+'</button>';
+  if(canShare)h+='<div class="hint" style="margin:0">Choisissez Gmail dans la liste : le fichier est joint et l’objet rempli ; il reste à indiquer le destinataire (Gmail le propose dès le 2ᵉ envoi).</div><button class="btn sec" data-act="download">Télécharger le fichier (dossier Téléchargements)</button>';
+  h+='<a class="btn sec" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="mailto:'+esc(encodeURIComponent(S.email||''))+'?subject='+esc(encodeURIComponent(mailSubject()))+'&body='+esc(encodeURIComponent('Fichier Klassali Terrain : '+ex.base+'.csv (à joindre depuis Téléchargements si absent).'))+'">Ouvrir un e-mail vide (sans pièce jointe)</a>';
+  h+='<pre class="csv">'+esc(ex.csv)+'</pre></div></div>';
   document.getElementById('layer').innerHTML=h}
 function download(name,text,type){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},2000)}
 function doShare(){
   var ex=window.__lastExport;if(!ex)return;
-  var jtxt=JSON.stringify(ex.json,null,2);
+  var name=ex.base+'.csv';
   if(navigator.share&&navigator.canShare&&window.File){
-    var files=[new File([jtxt],ex.base+'.json',{type:'application/json'}),new File([ex.csv],ex.base+'.csv',{type:'text/csv'})];
-    if(navigator.canShare({files:files})){navigator.share({files:files,title:mailSubject(),text:'À : '+(S.email||'')+'\n'+mailSubject()+'\n'+ex.json.series.length+' série(s) — fichier '+ex.base+'.json (Klassali Terrain)'}).then(function(){toast('Partagé.')}).catch(function(e){if(e&&e.name!=='AbortError'){download(ex.base+'.json',jtxt,'application/json');download(ex.base+'.csv',ex.csv,'text/csv')}});return}
+    var files=[new File([ex.file],name,{type:'text/csv'})];
+    if(navigator.canShare({files:files})){navigator.share({files:files,title:mailSubject(),text:'À : '+(S.email||'')+'\n'+mailSubject()+'\n'+ex.json.series.length+' série(s) — fichier '+name+' (Klassali Terrain)'}).then(function(){toast('Partagé.')}).catch(function(e){if(e&&e.name!=='AbortError'){download(name,ex.file,'text/csv');toast('Partage impossible : fichier téléchargé.')}});return}
   }
-  download(ex.base+'.json',jtxt,'application/json');download(ex.base+'.csv',ex.csv,'text/csv')}
+  download(name,ex.file,'text/csv');toast('Fichier téléchargé (dossier Téléchargements).')}
 
 /* =========================== événements =========================== */
 document.addEventListener('click',function(ev){
@@ -427,7 +432,7 @@ document.addEventListener('click',function(ev){
   if(a==='del'){var sx=sess();sx.series=sx.series.filter(function(x){return x.id!==D.id});save();closeSheet();render();toast('Série supprimée');return}
   if(a==='export'){openExport();return}
   if(a==='share'){doShare();return}
-  if(a==='download'){var ex=window.__lastExport;download(ex.base+'.json',JSON.stringify(ex.json,null,2),'application/json');download(ex.base+'.csv',ex.csv,'text/csv');return}
+  if(a==='download'){var ex=window.__lastExport;download(ex.base+'.csv',ex.file,'text/csv');toast('Fichier téléchargé (dossier Téléchargements).');return}
   if(a==='copy'){var ex2=window.__lastExport;try{navigator.clipboard.writeText(JSON.stringify(ex2.json,null,2)).then(function(){toast('JSON copié')},function(){toast('Copie impossible')})}catch(e){toast('Copie impossible')}return}
   if(a==='usecode'){var raw=(document.getElementById('code')||{}).value||'';var mm=/[#&]k=([^&\s]+)/.exec(raw);var q=parseQr(mm?mm[1]:raw.trim());if(q&&q.id&&applyQr(q)){toast('Projet « '+q.s+' » créé.');S.mode='home';render()}else toast('Code non reconnu. Collez le code ou le lien complet.');return}
   if(a==='selproj'){S.activeProjectId=id;S.activeSession=null;save();render();return}
