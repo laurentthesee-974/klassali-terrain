@@ -1,7 +1,7 @@
 /* Klassali Terrain — service worker : l'appli reste disponible sans réseau.
    À chaque nouvelle version livrée, le numéro CACHE change : l'ancien cache est supprimé
    et la page affiche « mise à jour installée » au prochain lancement. */
-const CACHE = 'klassali-terrain-v4';
+const CACHE = 'klassali-terrain-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

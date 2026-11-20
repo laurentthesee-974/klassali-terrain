@@ -12,7 +12,7 @@ Appli mobile qui note le numéro de la première photo de chaque élève, fratri
 5. Attendre 1 à 2 minutes. L'adresse est : `https://VOTRE-PSEUDO.github.io/klassali-terrain/`
 6. Coller cette adresse dans Klassali : **Paramètres → Adresse de l'appli mobile**, puis **Sauvegarder Config**.
 
-Mise à jour (nouvelle version livrée) : refaire l'étape 3 avec les nouveaux fichiers. Les téléphones affichent « Mise à jour installée » à l'ouverture suivante ; fermer et rouvrir l'appli.
+Mise à jour (nouvelle version livrée) : refaire l'étape 3 avec les nouveaux fichiers (les séries déjà notées sur les téléphones sont conservées). Les téléphones affichent « Mise à jour installée » à l'ouverture suivante ; fermer et rouvrir l'appli.
 
 ## 2. Installer sur le téléphone
 
@@ -44,9 +44,18 @@ Noms des fichiers : `Principale_École_Année`, `Rattrapage_École_AAAA-MM-JJ`, 
 
 Dans Klassali : menu **Terrain → Importer le fichier du téléphone**. Le fichier est rangé dans « Fichiers reçus » et rien ne bouge tant que vous ne cliquez pas **Renommage** : à ce moment Klassali demande où sont les photos et fait la correspondance (étape suivante du développement).
 
+## 6. Sauvegarde des séries (version 1.4.0)
+
+Les séries sont gardées **dans la mémoire du navigateur** du téléphone. Elles ne disparaissent pas toutes seules, mais **« Effacer les données de navigation › Cookies et données des sites »** (Chrome) les supprime définitivement.
+
+- **Installez l'appli sur l'écran d'accueil** (§ 2) : le navigateur protège alors son stockage (⚙ Paramètres affiche « ✓ Stockage protégé »).
+- **Bandeau orange « N modifications non sauvegardées »** : touchez **💾 Sauvegarder**. Un fichier `Klassali_Terrain_Sauvegarde_AAAA-MM-JJ_HHMM.csv` est déposé dans **Téléchargements** (tous les projets, toutes les séances). Faites-le à la fin de chaque séance, et avant tout nettoyage du téléphone.
+- **Exporter** une séance vers Klassali compte aussi comme sauvegarde de cette séance (le fichier envoyé contient tout).
+- **Restaurer** : ⚙ Paramètres (ou l'écran d'accueil si l'appli est vide) → **Restaurer depuis un fichier** → choisir la sauvegarde, **ou** un export envoyé à Klassali (Principale_…, Rattrapage_…, Groupes_…, retrouvé dans Gmail ou Téléchargements). Les séries sont ajoutées à celles du téléphone, sans doublon ; rien n'est effacé.
+
 ## Réglages utiles (⚙)
 
 - **Adresse e-mail de réception** : rappelée dans le message d'envoi.
 - **Votre prénom** : ajouté au nom du fichier des groupes et à l'objet du message.
 - **Préfixe du boîtier** (R62A) : affichage seulement, le fichier contient toujours le numéro seul.
-- Plusieurs projets peuvent cohabiter sur le téléphone ; **Effacer ce projet** après export.
+- Plusieurs projets peuvent cohabiter sur le téléphone ; **Effacer ce projet** après export et sauvegarde.
