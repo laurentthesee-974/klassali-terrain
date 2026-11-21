@@ -31,8 +31,10 @@ Ensuite l'appli s'ouvre depuis son icône, plein écran, même sans réseau.
 
 - **Séance principale** ou **Rattrapage (date)** : après chaque enfant, **+ Numéro** → taper le numéro de la première photo (26 pour R62A0026) → choisir Élève, Fratrie ou Classe → Enregistrer.
   - Élève absent de la liste : **+ Nouvel élève** (classe déjà remplie) ou « Nom inconnu » pour un élève générique.
-  - Fratrie : nom de la fratrie, enfants liés facultatifs.
-  - L'onglet **Restants** liste les élèves sans numéro (en rattrapage : les absents et sans photo), avec un bouton « + n° ».
+  - Fratrie : cochez les enfants, le **nom de la fratrie est proposé** (modifiable ; un nom tapé à la main est gardé). Enfants liés facultatifs.
+  - Le bouton **Enregistrer** reste en bas de l'écran, même avec une longue liste de noms.
+  - L'onglet **Restants** (version 1.5.0) : filtre par classe, et vues **À faire · Faits · Fratries · Absents · Refus · Tous**.
+    Sur chaque élève à faire : **+ n°**, **Absent**, **Refus** (« Annuler » pour revenir en arrière). Un absent noté à la séance principale est proposé dans les rattrapages ; s'il arrive finalement, son numéro efface l'absence. Les absents / refus partent dans le fichier exporté et Klassali met à jour le statut des élèves au **Renommage** (sauf ceux qui ont des photos).
 - **Groupes (2ᵉ photographe)** : **+ Numéro** → numéro → classe. Tout est rangé en g1.
 - Toucher une série pour la modifier (changer l'élève, le numéro) ou la supprimer.
 

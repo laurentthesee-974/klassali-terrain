@@ -103,6 +103,18 @@ button[aria-pressed="true"] .chk{background:var(--accent);border-color:var(--acc
 pre.csv{margin:0;padding:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;font:12px/1.5 var(--mono);overflow-x:auto;white-space:pre;max-height:30vh}
 .toast{pointer-events:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:700;z-index:30;max-width:90%;text-align:center}
 .todo{border-left:5px solid var(--warn)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch}
+.chips button{flex:none;min-height:40px;padding:0 12px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.rrow{gap:8px;padding:8px 10px 8px 12px}
+.rrow .main{flex:1;min-width:0}
+.rrow button.main{background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit}
+.acts{display:flex;gap:6px;flex:none;align-items:center}
+.mini{min-height:44px;padding:0 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px}
+.mini.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pill.abs{background:var(--warn-bg);color:var(--warn)}.pill.ref{background:var(--surface2);color:var(--danger)}.pill.done{background:var(--ok-bg);color:var(--ok)}
+.rrow.absr{border-left:5px solid var(--warn)}.rrow.refr{border-left:5px solid var(--danger)}.rrow.doner{border-left:5px solid var(--ok)}
+.stick{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) calc(-16px - env(safe-area-inset-bottom,0px));padding:10px max(16px,env(safe-area-inset-left,0px)) calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);box-shadow:0 -8px 14px -10px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:10px;z-index:2}
 .lotrow{display:flex;align-items:center;gap:10px}
 .lotrow button.pickl{flex:1;text-align:left;min-height:56px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);padding:0 14px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
 .lotrow button.pickl small{font-weight:400;color:var(--muted)}
@@ -129,7 +141,7 @@ input[type=file]{width:100%;min-height:52px;font-size:14px}
 <script>
 (function(){
 'use strict';
-var APP_VERSION='1.4.0';
+var APP_VERSION='1.5.0';
 var LS='klassali-terrain-v1';
 
 /* =========================== état =========================== */
@@ -164,7 +176,8 @@ function mergeProject(p,src){
   (src.students||[]).forEach(function(s){if(!findStu(p,s.id))p.students.push(s)});
   Object.keys(src.sessions||{}).forEach(function(k){var a=p.sessions[k]||(p.sessions[k]={series:[]});
     (src.sessions[k].series||[]).forEach(function(e){var ex=a.series.filter(function(x){return x.id===e.id})[0];
-      if(!ex){a.series.push(e);n++}else if((e.mt||e.at||'')>(ex.mt||ex.at||''))Object.keys(e).forEach(function(f){ex[f]=e[f]})})});
+      if(!ex){a.series.push(e);n++}else if((e.mt||e.at||'')>(ex.mt||ex.at||''))Object.keys(e).forEach(function(f){ex[f]=e[f]})});
+    var mk=src.sessions[k].marks||{};Object.keys(mk).forEach(function(id){a.marks=a.marks||{};var x=a.marks[id];if(!x||(mk[id].at||'')>(x.at||''))a.marks[id]=mk[id]})});
   return n}
 function restoreFile(text){
   var m=/#KLASSALI-BACKUP;([A-Za-z0-9+\/=]+)/.exec(text||''),j;
@@ -194,6 +207,7 @@ function restoreFile(text){
     var e={id:uid('e'),num:o.num,type:o.type,at:o.at||null};
     if(o.type==='eleve')e.studentId=o.studentId;else if(o.type==='fratrie'){e.label=o.label||'';e.members=o.members||[]}else e.classId=o.classId;
     sx.series.push(e);n++});
+  (j.marks||[]).forEach(function(m){if(m&&m.studentId!=null&&(m.statut==='Absent'||m.statut==='Refus')){sx.marks=sx.marks||{};if(!sx.marks[m.studentId])sx.marks[m.studentId]={statut:m.statut,at:m.at||null}}});
   S.activeProjectId=p.id;save();S.mode='home';render();
   toast(sessLabel(key)+' de « '+p.school+' » : '+n+' série(s) récupérée(s).'+(isNew?' Rechargez le fichier projet pour retrouver toute la liste des élèves.':''))}
 function restoreInput(id){var el=document.getElementById(id);if(el)el.addEventListener('change',function(){var f=el.files[0];if(!f)return;var r=new FileReader();r.onload=function(){restoreFile(String(r.result||''))};r.readAsText(f)})}
@@ -214,9 +228,31 @@ function pad(n){return S.prefix?S.prefix+String(n).padStart(4,'0'):String(n)}
 function sortedSeries(sx){return (sx||sess()||{series:[]}).series.slice().sort(function(a,b){return a.num-b.num})}
 function assignedNum(sid,exceptId){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.id===exceptId)return;if((e.type==='eleve'&&String(e.studentId)===String(sid))||(e.type==='fratrie'&&(e.members||[]).some(function(m){return String(m)===String(sid)})))r=e.num});return r}
 var GROUP_ONLY='Groupe seul'; // fait uniquement la photo de groupe : ni absent ni à rattraper
-function isAbsent(s){return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
-function absLabel(s){return s.statut==='Absent'?'absent':'sans photo'}
-function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&!s.created;return false})}
+/* Absent / Refus notés SUR PLACE, par séance : sx.marks = { idÉlève : { statut:'Absent'|'Refus', at } } — exportés
+   vers Klassali (statut de l'élève). Une absence notée à la séance principale compte pour les rattrapages. */
+function markOf(s,sx){sx=sx||sess();var m=sx&&sx.marks&&s&&sx.marks[s.id];return m?m.statut:null}
+function mainMark(s){var p=P();return p&&p.sessions.principale?markOf(s,p.sessions.principale):null}
+function shotInMain(s){var p=P(),sx=p&&p.sessions.principale;return !!(sx&&s&&sx.series.some(function(e){return e.type==='eleve'&&String(e.studentId)===String(s.id)}))}
+function isAbsent(s){if(shotInMain(s))return false;var mm=mainMark(s);if(mm)return mm==='Absent';return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
+function absLabel(s){return s.statut==='Absent'||mainMark(s)==='Absent'?'absent':'sans photo'}
+function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(markOf(s))return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&!s.created;return false})}
+function eleveSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='eleve'&&String(e.studentId)===String(sid))r=e});return r}
+function fratSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='fratrie'&&(e.members||[]).some(function(m){return String(m)===String(sid)}))r=e});return r}
+// état d'un élève dans la séance affichée : afaire | fait (série élève et/ou fratrie) | absent | refus | groupe | hors
+function stateOf(s){
+  var k=sessKind(),ev=eleveSerie(s.id),fr=fratSerie(s.id),m=markOf(s);
+  if(ev||fr)return{f:'fait',ev:ev,fr:fr,mark:m};
+  if(m)return{f:m==='Refus'?'refus':'absent',mark:m};
+  if(s.statut==='Refus')return{f:'refus'};
+  if(s.statut===GROUP_ONLY)return{f:'groupe'};
+  if(k==='rattrapage'&&!(isAbsent(s)&&!s.created))return{f:'hors'};
+  if(k==='principale'&&s.created)return{f:'hors'};
+  return{f:'afaire'}}
+var REST_FILTERS=[['afaire','À faire'],['fait','Faits'],['fratrie','Fratries'],['absent','Absents'],['refus','Refus'],['tous','Tous']];
+function inFilter(st,f){if(f==='tous')return true;if(f==='fait')return !!st.ev;if(f==='fratrie')return !!st.fr;if(f==='refus')return st.f==='refus'||st.f==='groupe'||st.mark==='Refus';return st.f===f}
+function setMark(id,m){var sx=sess();if(!sx)return;var s=stu(id);if(!s)return;sx.marks=sx.marks||{};if(m)sx.marks[s.id]={statut:m,at:new Date().toISOString()};else delete sx.marks[s.id];touch(sx);save();render();toast(m?sname(s)+' : '+(m==='Absent'?'absent(e)':'refus')+' — noté':'Statut de '+sname(s)+' retiré')}
+// nom de fratrie proposé : même règle que Klassali (nom du 1er enfant, puis les autres noms, puis les prénoms)
+function fratAuto(ids){var ms=ids.map(function(i){return stu(i)}).filter(function(x){return x&&!x.generic&&((x.nom||'').trim()||(x.prenom||'').trim())});if(!ms.length)return'';var first=(ms[0].nom||'').trim(),parts=[first];ms.forEach(function(m,i){if(i>0&&normName(m.nom)!==normName(first))parts.push((m.nom||'').trim());if((m.prenom||'').trim())parts.push(m.prenom.trim())});return parts.filter(Boolean).join(' ')}
 function toast(m){document.querySelectorAll('.toast').forEach(function(x){x.remove()});var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);clearTimeout(toastT);toastT=setTimeout(function(){t.remove()},2600)}
 
 /* =========================== QR (#k=) et fichier projet =========================== */
@@ -296,14 +332,26 @@ function viewSession(){
       h+='<button class="row" data-act="edit" data-id="'+e.id+'"><div class="num">'+e.num+'<small>'+esc(pad(e.num))+' '+endOf(list,i)+'</small></div><div class="main"><b>'+esc(l.t)+'</b><span>'+esc(l.s)+'</span></div><span class="pill '+e.type+'">'+{eleve:'Élève',fratrie:'Fratrie',classe:'Classe'}[e.type]+'</span></button>'});
     h+='</div>';
   }else{
-    h+='<div class="sum"><span>'+(k==='rattrapage'?'Élèves absents ou sans photo à la séance principale, pas encore notés dans ce lot.':'Élèves sans numéro dans cette séance.')+'</span></div>';
-    h+='<div style="padding:4px 0 10px">'+classSelect(S.restCls||'all',true,'restsel',false)+'</div><div class="list">';
-    var rl=rem.filter(function(s){return (S.restCls||'all')==='all'||String(s.classId)===String(S.restCls)});
-    if(!rl.length)h+='<div class="empty">Tout le monde a un numéro.</div>';
-    rl.sort(function(a,b){return (cls(a.classId)+a.nom).localeCompare(cls(b.classId)+b.nom,'fr')}).slice(0,400).forEach(function(s){h+='<button class="row todo" data-act="addfor" data-id="'+esc(s.id)+'"><div class="main"><b>'+esc(sname(s))+'</b><span>'+esc(cls(s.classId))+(isAbsent(s)?' · '+absLabel(s):'')+'</span></div><span class="pill">+ n°</span></button>'});
+    var rf=S.restFilter||'afaire',rc=S.restCls||'all',pp=P();
+    var pool=pp.students.filter(function(x){return rc==='all'||String(x.classId)===String(rc)}).map(function(x){return{s:x,st:stateOf(x)}}).filter(function(o){return o.st.f!=='hors'||rf==='tous'});
+    h+='<div style="padding:10px 0 8px">'+classSelect(rc,true,'restsel',false)+'</div><div class="chips" role="group" aria-label="Filtrer">';
+    REST_FILTERS.forEach(function(fl){var n=pool.filter(function(o){return inFilter(o.st,fl[0])}).length;if(fl[0]!=='afaire'&&fl[0]!=='tous'&&!n&&rf!==fl[0])return;h+='<button data-act="rf" data-f="'+fl[0]+'" aria-pressed="'+(rf===fl[0])+'">'+fl[1]+' '+n+'</button>'});
+    h+='</div><div class="list">';
+    var rl=pool.filter(function(o){return inFilter(o.st,rf)});
+    if(!rl.length)h+='<div class="empty">'+(rf==='afaire'?'Tout le monde a un numéro (ou est noté absent / refus).':'Personne dans cette vue.')+'</div>';
+    rl.sort(function(a,b){return (cls(a.s.classId)+a.s.nom+a.s.prenom).localeCompare(cls(b.s.classId)+b.s.nom+b.s.prenom,'fr')}).slice(0,400).forEach(function(o){h+=restRow(o.s,o.st)});
     h+='</div>';}
   h+='<button class="fab2" data-act="export">Exporter</button><button class="fab" data-act="add">+ Numéro</button>';
   return h}
+function restRow(s,st){
+  var id=esc(s.id),sub=esc(cls(s.classId)),pill='',acts='',cl='row rrow',main=null;
+  var add='<button class="mini go" data-act="addfor" data-id="'+id+'">+ n°</button>';
+  if(st.f==='afaire'){cl+=' todo';if(sessKind()!=='principale'&&isAbsent(s))sub+=' · '+absLabel(s);acts=add+'<button class="mini" data-act="mark" data-m="Absent" data-id="'+id+'">Absent</button><button class="mini" data-act="mark" data-m="Refus" data-id="'+id+'">Refus</button>'}
+  else if(st.f==='absent'||st.f==='refus'){cl+=st.f==='absent'?' absr':' refr';pill='<span class="pill '+(st.f==='absent'?'abs':'ref')+'">'+(st.f==='absent'?'Absent':'Refus')+(st.mark?'':' (Klassali)')+'</span>';acts=(st.mark?'<button class="mini" data-act="unmark" data-id="'+id+'">Annuler</button>':'')+add}
+  else if(st.f==='groupe'){pill='<span class="pill">👥 groupe seul</span>';acts=add}
+  else if(st.f==='fait'){cl+=' doner';if(st.fr)sub+=' · fratrie '+esc(st.fr.label||'sans nom')+' (n° '+st.fr.num+')';if(st.mark==='Refus')sub+=' · refus (photo individuelle)';pill=st.ev?'<span class="pill done">n° '+st.ev.num+'</span>':'<span class="pill fratrie">fratrie</span>';if(st.ev)main='<button class="main" data-act="edit" data-id="'+esc(st.ev.id)+'"><b>'+esc(sname(s))+'</b><span>'+sub+'</span></button>';if(!st.ev)acts=add}
+  else{pill='<span class="pill">présent</span>'}
+  return'<div class="'+cl+'" data-testid="rr-'+id+'">'+(main||'<div class="main"><b>'+esc(sname(s))+'</b><span>'+sub+'</span></div>')+pill+'<div class="acts">'+acts+'</div></div>'}
 function viewSet(){
   var p=P();
   var h=topbar('Paramètres','Projets et réglages',true,false)+'<div class="stack">';
@@ -329,6 +377,7 @@ function render(){
   var pn=document.getElementById('pname');if(pn)pn.addEventListener('input',function(){S.photographer=pn.value;save()});
   var pm=document.getElementById('pmail');if(pm)pm.addEventListener('input',function(){S.email=pm.value.trim();save()});
   restoreInput('rf');restoreInput('rf0');
+  var rs=document.getElementById('restsel');if(rs)rs.onchange=function(){S.restCls=rs.value==='all'?'all':realClassId(rs.value);save();render()};
 }
 
 /* =========================== feuille d’édition d’une série =========================== */
@@ -373,9 +422,9 @@ function sheetRt(){
   h+='<div><label class="f" for="f-num">Numéro de la 1ʳᵉ photo'+(k==='groupes'?' de la classe':'')+'</label><input class="bignum" id="f-num" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="26" value="'+esc(D.num)+'" autocomplete="off"><div class="hint" id="numhint">'+(D.num?esc(pad(parseInt(D.num,10)||0)):'Tapez seulement le numéro (26 pour R62A0026).')+'</div><div id="dup"></div></div>';
   if(allowedTypes().length>1)h+='<div class="seg"><button data-act="pt" data-t="eleve" aria-pressed="'+(D.type==='eleve')+'">Élève</button><button data-act="pt" data-t="fratrie" aria-pressed="'+(D.type==='fratrie')+'">Fratrie</button><button data-act="pt" data-t="classe" aria-pressed="'+(D.type==='classe')+'">Classe</button></div>';
   h+='<div id="body">'+bodyRt()+'</div>';
-  h+='<button class="btn" id="save" data-act="save">Enregistrer</button>';
+  h+='<div class="stick"><button class="btn" id="save" data-act="save">Enregistrer</button>';
   if(D.id)h+='<button class="btn del" data-act="del">Supprimer cette série</button>';
-  return h+'</div></div>'}
+  return h+'</div></div></div>'}
 function bodyRt(){
   var h='';
   if(D.type==='eleve'){
@@ -385,7 +434,7 @@ function bodyRt(){
       '<div class="two"><div><label class="f" for="nn">Nom</label><input type="text" id="nn" value="'+esc(D.nom||'')+'" '+(D.gen?'disabled':'')+' autocomplete="off" autocapitalize="words"></div><div><label class="f" for="np">Prénom</label><input type="text" id="np" value="'+esc(D.prenom||'')+'" '+(D.gen?'disabled':'')+' autocomplete="off" autocapitalize="words"></div></div>'+
       '<label class="cb"><input type="checkbox" id="gen" '+(D.gen?'checked':'')+'> Nom inconnu (élève générique)</label></div>'}
   }else if(D.type==='fratrie'){
-    h+='<div><label class="f" for="lb">Nom de la fratrie</label><input type="text" id="lb" placeholder="Martin" value="'+esc(D.label||'')+'" autocomplete="off" autocapitalize="words"><div class="hint">Les enfants liés sont facultatifs. Sans noms fournis par l’école, laissez-les vides.</div></div>'+
+    h+='<div><label class="f" for="lb">Nom de la fratrie</label><input type="text" id="lb" placeholder="Martin" value="'+esc(D.label||'')+'" autocomplete="off" autocapitalize="words"><div class="hint">'+(D.labelAuto&&D.label?'Proposé d’après les enfants cochés — modifiable. ':'')+'Les enfants liés sont facultatifs. Sans noms fournis par l’école, laissez-les vides.</div></div>'+
       '<label class="f" style="margin:0">Enfants liés ('+D.members.length+')</label>'+classSelect(D.cls,true,'csel',false)+'<input type="search" id="q" placeholder="Chercher un nom" value="'+esc(D.q||'')+'" autocomplete="off"><div class="pick" id="pick">'+pickHtml(true)+'</div>'
   }else{
     h+='<label class="f" style="margin:0 0 6px">Classe photographiée</label>'+classSelect(D.newClassOn?'new':D.cls,false,'csel',true);
@@ -401,7 +450,7 @@ function rebody(){var b=document.getElementById('body');if(b){b.innerHTML=bodyRt
 function wire(){
   var n=document.getElementById('f-num');if(n)n.oninput=function(){D.num=n.value.replace(/\D/g,'');if(n.value!==D.num)n.value=D.num;upd()};
   var q=document.getElementById('q');if(q)q.oninput=function(){D.q=q.value;document.getElementById('pick').innerHTML=pickHtml(D.type==='fratrie')};
-  var lb=document.getElementById('lb');if(lb)lb.oninput=function(){D.label=lb.value;upd()};
+  var lb=document.getElementById('lb');if(lb)lb.oninput=function(){D.label=lb.value;D.labelAuto=!lb.value.trim();upd()};
   var nn=document.getElementById('nn');if(nn)nn.oninput=function(){D.nom=nn.value;upd()};
   var np=document.getElementById('np');if(np)np.oninput=function(){D.prenom=np.value;upd()};
   var g=document.getElementById('gen');if(g)g.onchange=function(){D.gen=g.checked;rebody()};
@@ -424,6 +473,7 @@ function saveRt(){
     if(D.newClassOn){var nc={id:uid('newc-'),name:D.newClassName.trim(),created:true};p.classes.push(nc);e.classId=nc.id;e.newClass=true}
     else e.classId=D.cls;
     p.lastCls=e.classId}
+  if(sx.marks){if(e.studentId!=null)delete sx.marks[e.studentId];(e.members||[]).forEach(function(m){if(sx.marks[m]&&sx.marks[m].statut==='Absent')delete sx.marks[m]})}
   e.mt=new Date().toISOString();touch(sx);
   save();closeSheet();render();toast('Série '+n+' enregistrée')}
 function closeSheet(){D=null;document.getElementById('layer').innerHTML=''}
@@ -445,7 +495,8 @@ function buildExport(){
     project:{id:p.id,token:p.token,school:p.school,year:p.year},
     session:{kind:k,lot:sessLot(),role:p.role,photographer:S.photographer||'',exportedAt:new Date().toISOString(),app:APP_VERSION},
     classes:p.classes.map(function(c){return{id:c.id,name:c.name,created:!!c.created}}),
-    newStudents:newStudents,newClasses:newClasses,series:series};
+    newStudents:newStudents,newClasses:newClasses,series:series,
+    marks:Object.keys((sess()||{}).marks||{}).map(function(id){var m=sess().marks[id],st=stu(id);return{studentId:st?st.id:id,statut:m.statut,at:m.at||null,classId:st?st.classId:null,className:st?cls(st.classId):'',label:sname(st)}})};
   var csv=['numero_debut;numero_fin;type;classe;eleve;fratrie;enfants_lies;cree_sur_place'].concat(series.map(function(o){
     var c=o.classId?cls(o.classId):'';var st=o.studentId?stu(o.studentId):null;
     return[o.num,o.numEnd===null?'':o.numEnd,o.type,c,o.type==='eleve'?o.label:'',o.type==='fratrie'?o.label:'',o.type==='fratrie'?(o.members||[]).map(function(m){return sname(stu(m))}).join('|'):'',(st&&st.created)||(o.type==='classe'&&p.classes.filter(function(x){return String(x.id)===String(o.classId)&&x.created}).length)?1:0].join(';')})).join('\n');
@@ -460,10 +511,11 @@ function openExport(){
   var ex=buildExport();window.__lastExport=ex;
   var canShare=!!(navigator.share&&navigator.canShare&&window.File);
   var h='<div class="overlay" data-act="close"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-h"><h3>Exporter '+esc(sessLabel())+'</h3><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
-  h+='<div class="hint" style="margin:0">'+ex.json.series.length+' série(s) · fichier <b>'+esc(ex.base)+'.csv</b> : à importer dans Klassali (Terrain → Fichiers reçus), lisible aussi dans Excel.</div>';
-  if(!ex.json.series.length)h+='<div class="warn">Aucune série à exporter.</div>';
+  var nm=ex.json.marks.length;
+  h+='<div class="hint" style="margin:0">'+ex.json.series.length+' série(s)'+(nm?' · '+nm+' élève(s) noté(s) absent / refus':'')+' · fichier <b>'+esc(ex.base)+'.csv</b> : à importer dans Klassali (Terrain → Fichiers reçus), lisible aussi dans Excel.</div>';
+  if(!ex.json.series.length&&!nm)h+='<div class="warn">Aucune série à exporter.</div>';
   h+='<div class="hint" style="margin:0">Objet du message : <b>'+esc(mailSubject())+'</b> · à envoyer à <b>'+esc(S.email||'')+'</b></div>';
-  h+='<button class="btn" data-act="share" '+(ex.json.series.length?'':'disabled')+'>'+(canShare?'✉ Envoyer par e-mail (ou WhatsApp, Drive…)':'Télécharger le fichier')+'</button>';
+  h+='<button class="btn" data-act="share" '+(ex.json.series.length||nm?'':'disabled')+'>'+(canShare?'✉ Envoyer par e-mail (ou WhatsApp, Drive…)':'Télécharger le fichier')+'</button>';
   if(canShare)h+='<div class="hint" style="margin:0">Choisissez Gmail dans la liste : le fichier est joint et l’objet rempli ; il reste à indiquer le destinataire (Gmail le propose dès le 2ᵉ envoi).</div><button class="btn sec" data-act="download">Télécharger le fichier (dossier Téléchargements)</button>';
   h+='<a class="btn sec" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="mailto:'+esc(encodeURIComponent(S.email||''))+'?subject='+esc(encodeURIComponent(mailSubject()))+'&body='+esc(encodeURIComponent('Fichier Klassali Terrain : '+ex.base+'.csv (à joindre depuis Téléchargements si absent).'))+'">Ouvrir un e-mail vide (sans pièce jointe)</a>';
   h+='<pre class="csv">'+esc(ex.csv)+'</pre></div></div>';
@@ -491,11 +543,14 @@ document.addEventListener('click',function(ev){
   if(a==='add'){D=blank();openSheet();return}
   if(a==='addfor'){D=blank();var s=stu(id);if(!s)return;D.type='eleve';D.cls=s.classId;D.studentId=s.id;openSheet();return}
   if(a==='edit'){var e=sess().series.filter(function(x){return x.id===id})[0];if(!e)return;D=blank();D.id=e.id;D.num=String(e.num);D.type=e.type;
-    if(e.type==='eleve'){D.studentId=e.studentId;var ss=stu(e.studentId);D.cls=ss?ss.classId:'all'}else if(e.type==='fratrie'){D.label=e.label||'';D.members=(e.members||[]).slice();D.cls='all'}else D.cls=e.classId;
+    if(e.type==='eleve'){D.studentId=e.studentId;var ss=stu(e.studentId);D.cls=ss?ss.classId:'all'}else if(e.type==='fratrie'){D.label=e.label||'';D.labelAuto=!D.label;D.members=(e.members||[]).slice();D.cls='all'}else D.cls=e.classId;
     openSheet();return}
   if(a==='pt'){D.type=t.getAttribute('data-t');if(D.type==='classe'&&(D.cls==='all'||D.cls==null)){var pp=P();D.cls=pp.lastCls||(pp.classes[0]&&pp.classes[0].id)}if(D.type==='fratrie')D.cls='all';D.q='';D.newOn=false;D.newClassOn=false;rebody();document.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-pressed',b===t)});return}
   if(a==='ps'){D.studentId=String(D.studentId)===String(id)?null:realStudentId(id);D.newOn=false;document.getElementById('pick').innerHTML=pickHtml(false);upd();return}
-  if(a==='tm'){var rid=realStudentId(id);var i=D.members.map(String).indexOf(String(rid));if(i>-1)D.members.splice(i,1);else D.members.push(rid);rebody();return}
+  if(a==='tm'){var rid=realStudentId(id);var i=D.members.map(String).indexOf(String(rid));if(i>-1)D.members.splice(i,1);else D.members.push(rid);if(D.labelAuto!==false||!(D.label||'').trim()){D.label=fratAuto(D.members);D.labelAuto=true}rebody();return}
+  if(a==='rf'){S.restFilter=t.getAttribute('data-f');save();render();return}
+  if(a==='mark'){setMark(id,t.getAttribute('data-m'));return}
+  if(a==='unmark'){setMark(id,null);return}
   if(a==='newtog'){D.newOn=!D.newOn;if(D.newOn)D.studentId=null;rebody();return}
   if(a==='save'){if(validRt())saveRt();return}
   if(a==='del'){var sx=sess();sx.series=sx.series.filter(function(x){return x.id!==D.id});touch(sx);save();closeSheet();render();toast('Série supprimée');return}
