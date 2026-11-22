@@ -35,6 +35,7 @@ Ensuite l'appli s'ouvre depuis son icône, plein écran, même sans réseau.
   - Le bouton **Enregistrer** reste en bas de l'écran, même avec une longue liste de noms.
   - L'onglet **Restants** (version 1.5.0) : filtre par classe, et vues **À faire · Faits · Fratries · Absents · Refus · Tous**.
     Sur chaque élève à faire : **+ n°**, **Absent**, **Refus** (« Annuler » pour revenir en arrière). Un absent noté à la séance principale est proposé dans les rattrapages ; s'il arrive finalement, son numéro efface l'absence. Les absents / refus partent dans le fichier exporté et Klassali met à jour le statut des élèves au **Renommage** (sauf ceux qui ont des photos).
+  - **Projet repris en cours de route** (version 1.5.1) : quand le fichier projet est exporté par Klassali alors que la séance est déjà commencée, les élèves qui ont déjà une photo dans Klassali sont rangés dans **Faits** (étiquette « 📷 Klassali »), et ceux notés absents dans Klassali dans **Absents** (« Absent (Klassali) »). **À faire** ne montre donc que les élèves sans photo, ni absent, ni refus : c'est là qu'on note les absents. Réexportez le fichier projet depuis Klassali juste avant de partir, pour qu'il soit à jour.
 - **Groupes (2ᵉ photographe)** : **+ Numéro** → numéro → classe. Tout est rangé en g1.
 - Toucher une série pour la modifier (changer l'élève, le numéro) ou la supprimer.
 

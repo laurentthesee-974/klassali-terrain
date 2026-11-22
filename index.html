@@ -141,7 +141,7 @@ input[type=file]{width:100%;min-height:52px;font-size:14px}
 <script>
 (function(){
 'use strict';
-var APP_VERSION='1.5.0';
+var APP_VERSION='1.5.1';
 var LS='klassali-terrain-v1';
 
 /* =========================== état =========================== */
@@ -233,9 +233,10 @@ var GROUP_ONLY='Groupe seul'; // fait uniquement la photo de groupe : ni absent 
 function markOf(s,sx){sx=sx||sess();var m=sx&&sx.marks&&s&&sx.marks[s.id];return m?m.statut:null}
 function mainMark(s){var p=P();return p&&p.sessions.principale?markOf(s,p.sessions.principale):null}
 function shotInMain(s){var p=P(),sx=p&&p.sessions.principale;return !!(sx&&s&&sx.series.some(function(e){return e.type==='eleve'&&String(e.studentId)===String(s.id)}))}
-function isAbsent(s){if(shotInMain(s))return false;var mm=mainMark(s);if(mm)return mm==='Absent';return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
+function isAbsent(s){if(shotInMain(s)||hasKPhoto(s))return false;var mm=mainMark(s);if(mm)return mm==='Absent';return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
+function hasKPhoto(s){return !!s&&(s.photos>0||s.statut==='Photo prise'||s.statut==='Rattrapé')} // photo(s) déjà rattachée(s) dans Klassali
 function absLabel(s){return s.statut==='Absent'||mainMark(s)==='Absent'?'absent':'sans photo'}
-function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(markOf(s))return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&!s.created;return false})}
+function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(markOf(s))return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&s.statut!=='Absent'&&!hasKPhoto(s)&&!s.created;return false})}
 function eleveSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='eleve'&&String(e.studentId)===String(sid))r=e});return r}
 function fratSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='fratrie'&&(e.members||[]).some(function(m){return String(m)===String(sid)}))r=e});return r}
 // état d'un élève dans la séance affichée : afaire | fait (série élève et/ou fratrie) | absent | refus | groupe | hors
@@ -247,9 +248,11 @@ function stateOf(s){
   if(s.statut===GROUP_ONLY)return{f:'groupe'};
   if(k==='rattrapage'&&!(isAbsent(s)&&!s.created))return{f:'hors'};
   if(k==='principale'&&s.created)return{f:'hors'};
+  if(k==='principale'&&hasKPhoto(s))return{f:'deja'};
+  if(k==='principale'&&s.statut==='Absent')return{f:'absent'};
   return{f:'afaire'}}
 var REST_FILTERS=[['afaire','À faire'],['fait','Faits'],['fratrie','Fratries'],['absent','Absents'],['refus','Refus'],['tous','Tous']];
-function inFilter(st,f){if(f==='tous')return true;if(f==='fait')return !!st.ev;if(f==='fratrie')return !!st.fr;if(f==='refus')return st.f==='refus'||st.f==='groupe'||st.mark==='Refus';return st.f===f}
+function inFilter(st,f){if(f==='tous')return true;if(f==='fait')return !!st.ev||st.f==='deja';if(f==='fratrie')return !!st.fr;if(f==='refus')return st.f==='refus'||st.f==='groupe'||st.mark==='Refus';return st.f===f}
 function setMark(id,m){var sx=sess();if(!sx)return;var s=stu(id);if(!s)return;sx.marks=sx.marks||{};if(m)sx.marks[s.id]={statut:m,at:new Date().toISOString()};else delete sx.marks[s.id];touch(sx);save();render();toast(m?sname(s)+' : '+(m==='Absent'?'absent(e)':'refus')+' — noté':'Statut de '+sname(s)+' retiré')}
 // nom de fratrie proposé : même règle que Klassali (nom du 1er enfant, puis les autres noms, puis les prénoms)
 function fratAuto(ids){var ms=ids.map(function(i){return stu(i)}).filter(function(x){return x&&!x.generic&&((x.nom||'').trim()||(x.prenom||'').trim())});if(!ms.length)return'';var first=(ms[0].nom||'').trim(),parts=[first];ms.forEach(function(m,i){if(i>0&&normName(m.nom)!==normName(first))parts.push((m.nom||'').trim());if((m.prenom||'').trim())parts.push(m.prenom.trim())});return parts.filter(Boolean).join(' ')}
@@ -349,6 +352,7 @@ function restRow(s,st){
   if(st.f==='afaire'){cl+=' todo';if(sessKind()!=='principale'&&isAbsent(s))sub+=' · '+absLabel(s);acts=add+'<button class="mini" data-act="mark" data-m="Absent" data-id="'+id+'">Absent</button><button class="mini" data-act="mark" data-m="Refus" data-id="'+id+'">Refus</button>'}
   else if(st.f==='absent'||st.f==='refus'){cl+=st.f==='absent'?' absr':' refr';pill='<span class="pill '+(st.f==='absent'?'abs':'ref')+'">'+(st.f==='absent'?'Absent':'Refus')+(st.mark?'':' (Klassali)')+'</span>';acts=(st.mark?'<button class="mini" data-act="unmark" data-id="'+id+'">Annuler</button>':'')+add}
   else if(st.f==='groupe'){pill='<span class="pill">👥 groupe seul</span>';acts=add}
+  else if(st.f==='deja'){cl+=' doner';sub+=' · '+(s.photos>0?s.photos+' photo(s) déjà dans Klassali':'photo déjà prise (Klassali)');pill='<span class="pill done">📷 Klassali</span>';acts=add}
   else if(st.f==='fait'){cl+=' doner';if(st.fr)sub+=' · fratrie '+esc(st.fr.label||'sans nom')+' (n° '+st.fr.num+')';if(st.mark==='Refus')sub+=' · refus (photo individuelle)';pill=st.ev?'<span class="pill done">n° '+st.ev.num+'</span>':'<span class="pill fratrie">fratrie</span>';if(st.ev)main='<button class="main" data-act="edit" data-id="'+esc(st.ev.id)+'"><b>'+esc(sname(s))+'</b><span>'+sub+'</span></button>';if(!st.ev)acts=add}
   else{pill='<span class="pill">présent</span>'}
   return'<div class="'+cl+'" data-testid="rr-'+id+'">'+(main||'<div class="main"><b>'+esc(sname(s))+'</b><span>'+sub+'</span></div>')+pill+'<div class="acts">'+acts+'</div></div>'}
@@ -405,7 +409,7 @@ function pickHtml(multi){
   if(!l.length)return'<div class="empty" style="padding:12px">Aucun élève avec ce filtre. Utilisez « Nouvel élève ».</div>';
   l.slice(0,300).forEach(function(s){
     var n=assignedNum(s.id,D.id),on=multi?D.members.map(String).indexOf(String(s.id))>-1:String(D.studentId)===String(s.id);
-    var st=n!==null?'<span class="st done">n° '+n+'</span>':(s.statut===GROUP_ONLY?'<span class="st n">👥 groupe seul</span>':s.statut==='Refus'?'<span class="st n">refus</span>':isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st n">'+(s.statut==='Photo prise'?'photo prise':'présent')+'</span>');
+    var st=n!==null?'<span class="st done">n° '+n+'</span>':(s.statut===GROUP_ONLY?'<span class="st n">👥 groupe seul</span>':s.statut==='Refus'?'<span class="st n">refus</span>':hasKPhoto(s)?'<span class="st done">📷 photo Klassali</span>':isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st '+(hasKPhoto(s)?'done':'n')+'">'+(hasKPhoto(s)?'📷 photo Klassali':'présent')+'</span>');
     h+='<button data-act="'+(multi?'tm':'ps')+'" data-id="'+esc(s.id)+'" aria-pressed="'+on+'">'+(multi?'<span class="chk">'+(on?'✓':'')+'</span>':'')+'<span class="nm">'+esc(sname(s))+(D.cls==='all'?' <span style="font-weight:400;color:var(--muted)">· '+esc(cls(s.classId))+'</span>':'')+'</span>'+st+'</button>'});
   return h}
 function classSelect(sel,allowAll,id,withNew){
