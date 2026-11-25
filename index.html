@@ -50,7 +50,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline
 .mode .big{font:800 40px/1 var(--display);min-width:56px;text-align:center}
 .link{background:none;border:0;color:var(--accent);font-weight:700;padding:12px 0;text-align:left;min-height:48px}
 h2{font:800 16px var(--display);margin:0 0 8px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}.btn.sm{width:auto;padding:6px 12px;font-size:14px;margin:0;min-height:0}.kv .btn.sm{white-space:nowrap}
 .kv:last-child{border:0}.kv span:first-child{color:var(--muted)}.kv span:last-child{text-align:right;min-width:0;overflow-wrap:anywhere}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:14px}
 .tabs button{min-height:48px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-weight:700}
@@ -141,7 +141,7 @@ input[type=file]{width:100%;min-height:52px;font-size:14px}
 <script>
 (function(){
 'use strict';
-var APP_VERSION='1.5.1';
+var APP_VERSION='1.6.0';
 var LS='klassali-terrain-v1';
 
 /* =========================== état =========================== */
@@ -153,8 +153,11 @@ function save(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){toast('M
 /* ===== sécurité des données =====
    Les séries vivent dans la mémoire du navigateur : « Effacer les données de navigation › Cookies et données des sites »
    les supprime. 1) on demande au navigateur un stockage PERSISTANT (pas d'effacement automatique) ; 2) chaque séance
-   compte ses modifications non sauvegardées (bandeau orange) ; 3) « 💾 Sauvegarder » dépose un fichier dans
-   Téléchargements, rechargeable par « Restaurer » (et l'export envoyé à Klassali se recharge aussi). */
+   compte ses modifications non sauvegardées (bandeau orange) ; 3) « 💾 Sauvegarder » écrit UN fichier, toujours le
+   même (choisi la 1ʳᵉ fois, puis réécrit : pas de copies en série dans Téléchargements) ; sans cette possibilité du
+   navigateur (iPhone…), il est téléchargé sous un nom fixe ; 4) les 2 sauvegardes précédentes restent DANS l'appli
+   (copies de secours, jamais plus de 2), restaurables en un geste. « Restaurer » recharge aussi un fichier
+   (sauvegarde ou export envoyé à Klassali) : les séries sont ajoutées, rien n'est effacé. */
 var PERSIST=null;
 function askPersist(){try{if(!(navigator.storage&&navigator.storage.persisted))return;navigator.storage.persisted().then(function(p){if(p){PERSIST=true;return}if(!navigator.storage.persist){PERSIST=false;return}return navigator.storage.persist().then(function(g){PERSIST=!!g;if(S.mode==='set')render()})}).catch(function(){})}catch(e){}}
 function dirtyOf(p){p=p||P();if(!p)return 0;return Object.keys(p.sessions||{}).reduce(function(n,k){return n+(p.sessions[k].dirty||0)},0)}
@@ -168,7 +171,41 @@ function buildBackup(){
   Object.keys(S.projects).forEach(function(id){var p=S.projects[id];Object.keys(p.sessions||{}).forEach(function(k){lines.push([p.school,p.year,sessLabel(k),(p.sessions[k].series||[]).length].join(';'))})});
   var data={format:'klassali-terrain-backup',version:1,savedAt:new Date().toISOString(),app:APP_VERSION,state:{projects:S.projects,prefix:S.prefix||'',photographer:S.photographer||'',email:S.email||''}};
   return '\ufeff'+lines.join('\n')+'\n\n# Ligne technique pour Klassali Terrain (ne pas modifier)\n#KLASSALI-BACKUP;'+b64utf8(JSON.stringify(data))+'\n'}
-function doBackup(){download('Klassali_Terrain_Sauvegarde_'+stamp()+'.csv',buildBackup(),'text/csv');markSaved(null);render();toast('Sauvegarde déposée dans Téléchargements.')}
+var BK_NAME='Klassali_Terrain_Sauvegarde.csv',SEC_KEYS=[LS+'-secours-1',LS+'-secours-2'],BK_HANDLE=null;
+// --- fichier de sauvegarde unique (File System Access : Chrome Android / ordinateur) ; le « handle » est gardé en IndexedDB
+function fsaOK(){try{return typeof window.showSaveFilePicker==='function'&&window.isSecureContext!==false&&window.self===window.top}catch(e){return false}}
+function idbOpen(){return new Promise(function(res,rej){try{var r=indexedDB.open('klassali-terrain',1);r.onupgradeneeded=function(){r.result.createObjectStore('kv')};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}}catch(e){rej(e)}})}
+function idbGet(k){return idbOpen().then(function(db){return new Promise(function(res){var t=db.transaction('kv').objectStore('kv').get(k);t.onsuccess=function(){res(t.result||null)};t.onerror=function(){res(null)}})}).catch(function(){return null})}
+function idbSet(k,v){return idbOpen().then(function(db){return new Promise(function(res){try{var tx=db.transaction('kv','readwrite');if(v===null)tx.objectStore('kv').delete(k);else tx.objectStore('kv').put(v,k);tx.oncomplete=function(){res(true)};tx.onerror=function(){res(false)}}catch(e){res(false)}})}).catch(function(){return false})}
+function writeHandle(h,text){return h.createWritable().then(function(w){return w.write(new Blob([text],{type:'text/csv'})).then(function(){return w.close()})}).then(function(){return true})}
+function saveFsa(text,forceNew){
+  var h0=forceNew?null:BK_HANDLE;
+  return (h0?Promise.resolve(h0):(forceNew?Promise.resolve(null):idbGet('backupHandle'))).then(function(h){
+    if(!h)return null;BK_HANDLE=h;
+    var q=h.queryPermission?h.queryPermission({mode:'readwrite'}):Promise.resolve('granted');
+    return Promise.resolve(q).then(function(p){return p==='granted'?p:(h.requestPermission?h.requestPermission({mode:'readwrite'}):'denied')}).then(function(p){
+      if(p!=='granted')return null;return writeHandle(h,text).then(function(){return{ok:true,name:h.name}})}).catch(function(){return null})
+  }).then(function(r){
+    if(r)return r;
+    return window.showSaveFilePicker({suggestedName:BK_NAME,id:'klassali-terrain-sauvegarde',types:[{description:'Sauvegarde Klassali Terrain',accept:{'text/csv':['.csv']}}]}).then(function(h){
+      BK_HANDLE=h;S.backupFile=h.name;save();idbSet('backupHandle',h);
+      return writeHandle(h,text).then(function(){return{ok:true,name:h.name,first:true}})
+    },function(e){return e&&e.name==='AbortError'?{cancel:true}:{err:e}})})}
+// --- 2 copies de secours DANS l'appli (les 2 dernières sauvegardes), jamais plus
+function secours(){return SEC_KEYS.map(function(k){try{var v=JSON.parse(localStorage.getItem(k)||'null');return v&&v.text?v:null}catch(e){return null}})}
+function seriesTotal(){return Object.keys(S.projects).reduce(function(n,id){var p=S.projects[id];return n+Object.keys(p.sessions||{}).reduce(function(a,k){return a+((p.sessions[k].series||[]).length)},0)},0)}
+function pushSecours(text){try{var a=secours();if(a[0])localStorage.setItem(SEC_KEYS[1],JSON.stringify(a[0]));localStorage.setItem(SEC_KEYS[0],JSON.stringify({at:new Date().toISOString(),series:seriesTotal(),projects:Object.keys(S.projects).length,text:text}))}catch(e){}}
+function dlBackup(text){download(BK_NAME,text,'text/csv');markSaved(null);render();toast('Sauvegarde déposée dans Téléchargements (« '+BK_NAME+' »).')}
+function doBackup(forceNew){
+  var text=buildBackup();pushSecours(text);
+  if(!fsaOK())return dlBackup(text);
+  saveFsa(text,forceNew).then(function(r){
+    if(r&&r.ok){markSaved(null);render();toast(r.first?'Sauvegarde enregistrée dans « '+r.name+' » : ce même fichier sera réécrit à chaque sauvegarde.':'Sauvegarde enregistrée (« '+r.name+' » réécrit, pas de nouvelle copie).');return}
+    if(r&&r.cancel){render();toast("Aucun fichier choisi : la sauvegarde reste en copie de secours dans l'appli.");return}
+    dlBackup(text)})}
+function secoursHtml(){var a=secours();if(!a[0]&&!a[1])return '';
+  return '<div class="kv" style="margin-top:10px"><span><b>Copies de secours</b> (dans l’appli, les 2 dernières sauvegardes)</span><span></span></div>'+a.map(function(v,i){return v?'<div class="kv" data-testid="sec-'+i+'"><span>'+(i?'Avant-dernière':'Dernière')+' : '+esc(new Date(v.at).toLocaleString('fr-FR'))+' — '+v.series+' série(s)</span><span><button class="btn sm" data-act="secours" data-i="'+i+'">Restaurer</button></span></div>':''}).join('')+'<div class="hint">Restaurer ajoute les séries de la copie à celles du téléphone, rien n’est effacé.</div>'}
+function restoreSecours(i){var v=secours()[i];if(!v)return toast('Pas de copie de secours.');restoreFile(v.text)}
 function findStu(p,id){return p.students.filter(function(x){return String(x.id)===String(id)})[0]}
 function mergeProject(p,src){
   var n=0;
@@ -233,16 +270,18 @@ var GROUP_ONLY='Groupe seul'; // fait uniquement la photo de groupe : ni absent 
 function markOf(s,sx){sx=sx||sess();var m=sx&&sx.marks&&s&&sx.marks[s.id];return m?m.statut:null}
 function mainMark(s){var p=P();return p&&p.sessions.principale?markOf(s,p.sessions.principale):null}
 function shotInMain(s){var p=P(),sx=p&&p.sessions.principale;return !!(sx&&s&&sx.series.some(function(e){return e.type==='eleve'&&String(e.studentId)===String(s.id)}))}
-function isAbsent(s){if(shotInMain(s)||hasKPhoto(s))return false;var mm=mainMark(s);if(mm)return mm==='Absent';return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
+function isAbsent(s){if(shotInMain(s)||hasKPhoto(s)||noAuth(s))return false;var mm=mainMark(s);if(mm)return mm==='Absent';return s.statut==='Absent'||(!s.photos&&s.statut!=='Refus'&&s.statut!=='Photo prise'&&s.statut!==GROUP_ONLY)} // sans photo = à rattraper
+function noAuth(s){return !!s&&s.autorisation===false} // vente en ligne : non autorisé à être photographié (Klassali)
 function hasKPhoto(s){return !!s&&(s.photos>0||s.statut==='Photo prise'||s.statut==='Rattrapé')} // photo(s) déjà rattachée(s) dans Klassali
 function absLabel(s){return s.statut==='Absent'||mainMark(s)==='Absent'?'absent':'sans photo'}
-function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(markOf(s))return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&s.statut!=='Absent'&&!hasKPhoto(s)&&!s.created;return false})}
+function remaining(){var p=P();if(!p)return[];var k=sessKind();return p.students.filter(function(s){if(assignedNum(s.id)!==null)return false;if(markOf(s))return false;if(noAuth(s))return false;if(k==='rattrapage')return isAbsent(s)&&!s.created;if(k==='principale')return s.statut!=='Refus'&&s.statut!==GROUP_ONLY&&s.statut!=='Absent'&&!hasKPhoto(s)&&!s.created;return false})}
 function eleveSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='eleve'&&String(e.studentId)===String(sid))r=e});return r}
 function fratSerie(sid){var r=null;(sess()||{series:[]}).series.forEach(function(e){if(e.type==='fratrie'&&(e.members||[]).some(function(m){return String(m)===String(sid)}))r=e});return r}
 // état d'un élève dans la séance affichée : afaire | fait (série élève et/ou fratrie) | absent | refus | groupe | hors
 function stateOf(s){
   var k=sessKind(),ev=eleveSerie(s.id),fr=fratSerie(s.id),m=markOf(s);
   if(ev||fr)return{f:'fait',ev:ev,fr:fr,mark:m};
+  if(noAuth(s))return{f:'refus',na:true};
   if(m)return{f:m==='Refus'?'refus':'absent',mark:m};
   if(s.statut==='Refus')return{f:'refus'};
   if(s.statut===GROUP_ONLY)return{f:'groupe'};
@@ -290,7 +329,7 @@ function importProjectFile(text){
   p.token=j.project.token||p.token;p.school=j.project.school||p.school;p.year=String(j.project.year||p.year);p.role='full';
   mergeClasses(p,j.classes||[]);
   var created=p.students.filter(function(s){return s.created});
-  p.students=(j.students||[]).map(function(s){return{id:s.id,nom:s.nom||'',prenom:s.prenom||'',classId:s.classId,statut:s.statut||'',photos:s.photos||0}}).concat(created);
+  p.students=(j.students||[]).map(function(s){var o={id:s.id,nom:s.nom||'',prenom:s.prenom||'',classId:s.classId,statut:s.statut||'',photos:s.photos||0};if(s.autorisation===false)o.autorisation=false;return o}).concat(created);
   p.fratries=(j.fratries||[]).map(function(f){return{id:f.id,nom:f.nom||'',membres:f.membres||[],photos:f.photos||0}});
   p.fileLoadedAt=new Date().toISOString();
   S.activeProjectId=p.id;save();
@@ -350,7 +389,7 @@ function restRow(s,st){
   var id=esc(s.id),sub=esc(cls(s.classId)),pill='',acts='',cl='row rrow',main=null;
   var add='<button class="mini go" data-act="addfor" data-id="'+id+'">+ n°</button>';
   if(st.f==='afaire'){cl+=' todo';if(sessKind()!=='principale'&&isAbsent(s))sub+=' · '+absLabel(s);acts=add+'<button class="mini" data-act="mark" data-m="Absent" data-id="'+id+'">Absent</button><button class="mini" data-act="mark" data-m="Refus" data-id="'+id+'">Refus</button>'}
-  else if(st.f==='absent'||st.f==='refus'){cl+=st.f==='absent'?' absr':' refr';pill='<span class="pill '+(st.f==='absent'?'abs':'ref')+'">'+(st.f==='absent'?'Absent':'Refus')+(st.mark?'':' (Klassali)')+'</span>';acts=(st.mark?'<button class="mini" data-act="unmark" data-id="'+id+'">Annuler</button>':'')+add}
+  else if(st.f==='absent'||st.f==='refus'){cl+=st.f==='absent'?' absr':' refr';pill=st.na?'<span class="pill ref">🚫 Non autorisé</span>':'<span class="pill '+(st.f==='absent'?'abs':'ref')+'">'+(st.f==='absent'?'Absent':'Refus')+(st.mark?'':' (Klassali)')+'</span>';if(st.na)sub+=' · ne pas photographier';acts=(st.mark?'<button class="mini" data-act="unmark" data-id="'+id+'">Annuler</button>':'')+add}
   else if(st.f==='groupe'){pill='<span class="pill">👥 groupe seul</span>';acts=add}
   else if(st.f==='deja'){cl+=' doner';sub+=' · '+(s.photos>0?s.photos+' photo(s) déjà dans Klassali':'photo déjà prise (Klassali)');pill='<span class="pill done">📷 Klassali</span>';acts=add}
   else if(st.f==='fait'){cl+=' doner';if(st.fr)sub+=' · fratrie '+esc(st.fr.label||'sans nom')+' (n° '+st.fr.num+')';if(st.mark==='Refus')sub+=' · refus (photo individuelle)';pill=st.ev?'<span class="pill done">n° '+st.ev.num+'</span>':'<span class="pill fratrie">fratrie</span>';if(st.ev)main='<button class="main" data-act="edit" data-id="'+esc(st.ev.id)+'"><b>'+esc(sname(s))+'</b><span>'+sub+'</span></button>';if(!st.ev)acts=add}
@@ -366,7 +405,7 @@ function viewSet(){
   h+='<label class="f" for="pf" style="margin-top:8px">Charger / mettre à jour le fichier projet</label><input type="file" id="pf" accept=".json,application/json"><p class="filehint">Fichier « Klassali_Projet_École_Année.json » exporté par Klassali (menu Terrain). Les élèves créés sur ce téléphone sont conservés.</p></div>';
   h+='<div class="card"><h2>Nouveau projet sans QR</h2><label class="f" for="code">Code projet (ou lien) envoyé par Klassali</label><input type="text" id="code" placeholder="2|ab12cd34|École…|2026-2027|g|CE1-1|…" autocomplete="off"><button class="btn sec" style="margin-top:8px" data-act="usecode">Créer le projet</button></div><div class="card"><h2>Réglages</h2><label class="f" for="pmail">Adresse e-mail de réception des fichiers</label><input type="text" id="pmail" value="'+esc(S.email||'')+'" inputmode="email" autocomplete="email"><div class="hint">Rappelée dans le message préparé par « Envoyer par e-mail ».</div><label class="f" for="pname" style="margin-top:10px">Votre prénom (nom du fichier exporté)</label><input type="text" id="pname" value="'+esc(S.photographer||'')+'" autocomplete="given-name"><label class="f" for="pref" style="margin-top:10px">Préfixe du boîtier (affichage seulement)</label><input type="text" id="pref" value="'+esc(S.prefix||'')+'" placeholder="R62A" autocomplete="off"><div class="hint">Vous tapez 26, l’appli affiche '+(S.prefix?esc(S.prefix)+'0026':'26')+'. Le fichier exporté contient toujours le numéro seul.</div></div>';
   var last=S.lastBackupAt?new Date(S.lastBackupAt).toLocaleString('fr-FR'):'jamais';
-  h+='<div class="card" data-testid="safety"><h2>Sauvegarde des séries</h2>'+(PERSIST===true?'<div class="okb">✓ Stockage protégé : le téléphone ne l’effacera pas de lui-même.</div>':'<div class="banner" style="margin-top:0">Stockage non protégé : installez l’appli sur l’écran d’accueil (menu ⋮ › Ajouter à l’écran d’accueil) pour que le navigateur la protège.</div>')+'<p class="safe">⚠ « Effacer les données de navigation › <b>Cookies et données des sites</b> » supprime les séries de ce téléphone. Sauvegardez après chaque séance.</p><div class="kv" style="margin-top:8px"><span>Dernière sauvegarde</span><span>'+esc(last)+'</span></div><div class="kv"><span>Modifications non sauvegardées</span><span>'+dirtyAll()+'</span></div><button class="btn" style="margin-top:10px" data-act="backup">💾 Sauvegarder tout (fichier)</button><div class="hint">Un fichier « Klassali_Terrain_Sauvegarde_….csv » est déposé dans Téléchargements (tous les projets, toutes les séances).</div><label class="f" for="rf" style="margin-top:12px">Restaurer depuis un fichier</label><input type="file" id="rf" accept=".csv,.txt,text/csv,text/plain"><div class="hint">Sauvegarde ou export envoyé à Klassali : les séries sont ajoutées à celles du téléphone, rien n’est effacé.</div></div>';
+  h+='<div class="card" data-testid="safety"><h2>Sauvegarde des séries</h2>'+(PERSIST===true?'<div class="okb">✓ Stockage protégé : le téléphone ne l’effacera pas de lui-même.</div>':'<div class="banner" style="margin-top:0">Stockage non protégé : installez l’appli sur l’écran d’accueil (menu ⋮ › Ajouter à l’écran d’accueil) pour que le navigateur la protège.</div>')+'<p class="safe">⚠ « Effacer les données de navigation › <b>Cookies et données des sites</b> » supprime les séries de ce téléphone. Sauvegardez après chaque séance.</p><div class="kv" style="margin-top:8px"><span>Dernière sauvegarde</span><span>'+esc(last)+'</span></div><div class="kv"><span>Modifications non sauvegardées</span><span>'+dirtyAll()+'</span></div><button class="btn" style="margin-top:10px" data-act="backup">💾 Sauvegarder tout</button><div class="hint" data-testid="bk-file">'+(fsaOK()?(S.backupFile?'Fichier de sauvegarde : <b>'+esc(S.backupFile)+'</b>, réécrit à chaque sauvegarde (pas de nouvelle copie). <a href="#" data-act="backupnew">Changer de fichier</a>':'À la 1ʳᵉ sauvegarde, choisissez où ranger le fichier (ex. Documents) : ce même fichier sera ensuite réécrit à chaque fois.'):'Le fichier « '+BK_NAME+' » est déposé dans Téléchargements (tous les projets, toutes les séances).')+'</div>'+secoursHtml()+'<label class="f" for="rf" style="margin-top:12px">Restaurer depuis un fichier</label><input type="file" id="rf" accept=".csv,.txt,text/csv,text/plain"><div class="hint">Sauvegarde ou export envoyé à Klassali : les séries sont ajoutées à celles du téléphone, rien n’est effacé.</div></div>';
   if(p)h+='<div class="card"><h2>Projet actif : '+esc(p.school)+'</h2><div class="kv"><span>Identifiant</span><span style="font-family:var(--mono)">'+esc(p.id)+'</span></div><div class="kv"><span>Rôle</span><span>'+(p.role==='full'?'Photographe principal':'2ᵉ photographe (groupes)')+'</span></div><div class="kv"><span>Classes</span><span>'+p.classes.length+'</span></div><div class="kv"><span>Élèves</span><span>'+(p.students.length||'non chargés')+'</span></div><div class="kv"><span>Séries notées</span><span>'+Object.keys(p.sessions).map(function(k){return p.sessions[k].series.length}).reduce(function(a,b){return a+b},0)+'</span></div><button class="btn del" style="margin-top:10px" data-act="delproj">Effacer ce projet du téléphone</button><div class="hint">Sauvegardez d’abord (💾 ci-dessus) : l’effacement est définitif.</div></div>';
   h+='<div class="hint" style="text-align:center">Klassali Terrain '+APP_VERSION+'</div></div>';
   return h}
@@ -409,7 +448,7 @@ function pickHtml(multi){
   if(!l.length)return'<div class="empty" style="padding:12px">Aucun élève avec ce filtre. Utilisez « Nouvel élève ».</div>';
   l.slice(0,300).forEach(function(s){
     var n=assignedNum(s.id,D.id),on=multi?D.members.map(String).indexOf(String(s.id))>-1:String(D.studentId)===String(s.id);
-    var st=n!==null?'<span class="st done">n° '+n+'</span>':(s.statut===GROUP_ONLY?'<span class="st n">👥 groupe seul</span>':s.statut==='Refus'?'<span class="st n">refus</span>':hasKPhoto(s)?'<span class="st done">📷 photo Klassali</span>':isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st '+(hasKPhoto(s)?'done':'n')+'">'+(hasKPhoto(s)?'📷 photo Klassali':'présent')+'</span>');
+    var st=n!==null?'<span class="st done">n° '+n+'</span>':(noAuth(s)?'<span class="st n" style="color:#f87171">🚫 non autorisé</span>':s.statut===GROUP_ONLY?'<span class="st n">👥 groupe seul</span>':s.statut==='Refus'?'<span class="st n">refus</span>':hasKPhoto(s)?'<span class="st done">📷 photo Klassali</span>':isAbsent(s)?'<span class="st abs">'+absLabel(s)+'</span>':'<span class="st '+(hasKPhoto(s)?'done':'n')+'">'+(hasKPhoto(s)?'📷 photo Klassali':'présent')+'</span>');
     h+='<button data-act="'+(multi?'tm':'ps')+'" data-id="'+esc(s.id)+'" aria-pressed="'+on+'">'+(multi?'<span class="chk">'+(on?'✓':'')+'</span>':'')+'<span class="nm">'+esc(sname(s))+(D.cls==='all'?' <span style="font-weight:400;color:var(--muted)">· '+esc(cls(s.classId))+'</span>':'')+'</span>'+st+'</button>'});
   return h}
 function classSelect(sel,allowAll,id,withNew){
@@ -559,6 +598,8 @@ document.addEventListener('click',function(ev){
   if(a==='save'){if(validRt())saveRt();return}
   if(a==='del'){var sx=sess();sx.series=sx.series.filter(function(x){return x.id!==D.id});touch(sx);save();closeSheet();render();toast('Série supprimée');return}
   if(a==='backup'){doBackup();return}
+  if(a==='backupnew'){if(ev&&ev.preventDefault)ev.preventDefault();BK_HANDLE=null;idbSet('backupHandle',null);delete S.backupFile;save();doBackup(true);return}
+  if(a==='secours'){restoreSecours(+t.getAttribute('data-i'));return}
   if(a==='export'){openExport();return}
   if(a==='share'){doShare();return}
   if(a==='download'){var ex=window.__lastExport;download(ex.base+'.csv',ex.file,'text/csv');markSaved(sess());render();toast('Fichier téléchargé (dossier Téléchargements).');return}

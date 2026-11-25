@@ -36,6 +36,7 @@ Ensuite l'appli s'ouvre depuis son icône, plein écran, même sans réseau.
   - L'onglet **Restants** (version 1.5.0) : filtre par classe, et vues **À faire · Faits · Fratries · Absents · Refus · Tous**.
     Sur chaque élève à faire : **+ n°**, **Absent**, **Refus** (« Annuler » pour revenir en arrière). Un absent noté à la séance principale est proposé dans les rattrapages ; s'il arrive finalement, son numéro efface l'absence. Les absents / refus partent dans le fichier exporté et Klassali met à jour le statut des élèves au **Renommage** (sauf ceux qui ont des photos).
   - **Projet repris en cours de route** (version 1.5.1) : quand le fichier projet est exporté par Klassali alors que la séance est déjà commencée, les élèves qui ont déjà une photo dans Klassali sont rangés dans **Faits** (étiquette « 📷 Klassali »), et ceux notés absents dans Klassali dans **Absents** (« Absent (Klassali) »). **À faire** ne montre donc que les élèves sans photo, ni absent, ni refus : c'est là qu'on note les absents. Réexportez le fichier projet depuis Klassali juste avant de partir, pour qu'il soit à jour.
+  - **Vente en ligne : enfants non autorisés** (version 1.5.2) : un élève marqué « 🚫 Non autorisé » dans Klassali (grille des autorisations) est rangé dans **Refus** avec l'étiquette « 🚫 Non autorisé » : il n'apparaît ni dans **À faire** ni en rattrapage, et la liste « + Numéro » le signale.
 - **Groupes (2ᵉ photographe)** : **+ Numéro** → numéro → classe. Tout est rangé en g1.
 - Toucher une série pour la modifier (changer l'élève, le numéro) ou la supprimer.
 
@@ -47,12 +48,15 @@ Noms des fichiers : `Principale_École_Année`, `Rattrapage_École_AAAA-MM-JJ`, 
 
 Dans Klassali : menu **Terrain → Importer le fichier du téléphone**. Le fichier est rangé dans « Fichiers reçus » et rien ne bouge tant que vous ne cliquez pas **Renommage** : à ce moment Klassali demande où sont les photos et fait la correspondance (étape suivante du développement).
 
-## 6. Sauvegarde des séries (version 1.4.0)
+## 6. Sauvegarde des séries (version 1.4.0, revue en 1.6.0)
 
 Les séries sont gardées **dans la mémoire du navigateur** du téléphone. Elles ne disparaissent pas toutes seules, mais **« Effacer les données de navigation › Cookies et données des sites »** (Chrome) les supprime définitivement.
 
 - **Installez l'appli sur l'écran d'accueil** (§ 2) : le navigateur protège alors son stockage (⚙ Paramètres affiche « ✓ Stockage protégé »).
-- **Bandeau orange « N modifications non sauvegardées »** : touchez **💾 Sauvegarder**. Un fichier `Klassali_Terrain_Sauvegarde_AAAA-MM-JJ_HHMM.csv` est déposé dans **Téléchargements** (tous les projets, toutes les séances). Faites-le à la fin de chaque séance, et avant tout nettoyage du téléphone.
+- **Bandeau orange « N modifications non sauvegardées »** : touchez **💾 Sauvegarder** (version 1.6.0 : plus de copies en série).
+  - **Téléphone Android (Chrome)** : à la 1ʳᵉ sauvegarde, choisissez où ranger le fichier (proposé : `Klassali_Terrain_Sauvegarde.csv`, par ex. dans Documents). Ensuite, **ce même fichier est réécrit** à chaque sauvegarde : un seul fichier, jamais de copie. Il se peut que Chrome redemande l'autorisation d'écrire dans ce fichier à la 1ʳᵉ sauvegarde de la journée. ⚙ Paramètres → **Changer de fichier** pour en choisir un autre.
+  - **iPhone / autre navigateur** (pas d'écriture dans un fichier choisi) : le fichier est téléchargé sous le nom fixe `Klassali_Terrain_Sauvegarde.csv`.
+  - **2 copies de secours dans l'appli** : les deux dernières sauvegardes restent aussi dans le téléphone (jamais plus de 2). ⚙ Paramètres → **Copies de secours → Restaurer** (dernière ou avant-dernière) : les séries sont ajoutées, rien n'est effacé. Elles disparaissent si l'on efface les données du navigateur : c'est le fichier qui protège ce cas.
 - **Exporter** une séance vers Klassali compte aussi comme sauvegarde de cette séance (le fichier envoyé contient tout).
 - **Restaurer** : ⚙ Paramètres (ou l'écran d'accueil si l'appli est vide) → **Restaurer depuis un fichier** → choisir la sauvegarde, **ou** un export envoyé à Klassali (Principale_…, Rattrapage_…, Groupes_…, retrouvé dans Gmail ou Téléchargements). Les séries sont ajoutées à celles du téléphone, sans doublon ; rien n'est effacé.
 
